@@ -7,6 +7,21 @@ A tiny screenshot shelf designed for coding-agent workflows on Linux. It turns s
 
 Press **Ctrl+Shift+4**, select a region, then either paste the image from your clipboard or drag its thumbnail directly into your terminal. Captures are saved to `~/Pictures/VibeShot`.
 
+## Download the AppImage
+
+Download the latest AppImage from [GitHub Releases](https://github.com/luckeyfaraday/vibe-shot/releases/latest), then:
+
+```bash
+chmod +x VibeShot-*.AppImage
+./VibeShot-*.AppImage
+```
+
+You can also double-click it after enabling **Allow executing file as program** in its file properties. Keep the AppImage somewhere permanent, such as `~/Applications`; VibeShot continues running from the tray after its shelf is hidden.
+
+Launch the AppImage once after downloading it. It registers itself to start quietly in the tray at login, so `Ctrl+Shift+4` works globally after future boots without opening the shelf first.
+
+The AppImage bundles VibeShot itself. Your system still needs X11 and `gnome-screenshot` for screen selection.
+
 ## Why VibeShot?
 
 - One shortcut from capture to clipboard
@@ -24,6 +39,12 @@ npm run dev
 ```
 
 Requirements: Linux with X11, Node.js 20 or newer, and `gnome-screenshot`. The current release is developed and tested on Ubuntu 24.04 with Cinnamon.
+
+To build the AppImage yourself:
+
+```bash
+npm run dist:appimage
+```
 
 ## Install on this machine
 
@@ -43,6 +64,8 @@ This adds VibeShot to the Cinnamon app menu, links a `vibeshot` command into `~/
 - Drag a thumbnail: drop the PNG file into a coding-agent CLI or any file-aware app
 
 VibeShot currently targets Cinnamon/X11 and uses the machine's existing `gnome-screenshot` capture UI.
+
+The AppImage can also be invoked directly with `--capture`, which captures immediately whether or not VibeShot is already running.
 
 ## Uninstall
 

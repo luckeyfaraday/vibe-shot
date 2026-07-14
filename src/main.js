@@ -10,6 +10,7 @@ let mainWindow;
 let tray;
 let isCapturing = false;
 let captureHistory = [];
+let startupNotice = '';
 
 function trayIcon() {
   const svg = `
@@ -23,6 +24,30 @@ function trayIcon() {
 
 function statePath() {
   return path.join(app.getPath('userData'), 'state.json');
+}
+
+function desktopExecPath(filePath) {
+  return `"${filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function ensureAppImageAutostart() {
+  const appImagePath = process.env.APPIMAGE;
+  if (!appImagePath || !fs.existsSync(appImagePath)) return;
+
+  const autostartDirectory = path.join(app.getPath('home'), '.config', 'autostart');
+  const autostartPath = path.join(autostartDirectory, 'vibeshot.desktop');
+  const entry = `[Desktop Entry]\nName=VibeShot\nComment=Keep the screenshot shortcut ready\nExec=${desktopExecPath(appImagePath)} --hidden\nTerminal=false\nType=Application\nX-GNOME-Autostart-enabled=true\nStartupNotify=false\nStartupWMClass=vibeshot\n`;
+
+  try {
+    fs.mkdirSync(autostartDirectory, { recursive: true });
+    const existing = fs.existsSync(autostartPath) ? fs.readFileSync(autostartPath, 'utf8') : '';
+    if (existing !== entry) {
+      fs.writeFileSync(autostartPath, entry);
+      startupNotice = 'Shortcut will be ready automatically at login';
+    }
+  } catch (error) {
+    console.warn('Could not create the VibeShot autostart entry:', error.message);
+  }
 }
 
 function loadState() {
@@ -88,7 +113,7 @@ function createWindow() {
       mainWindow.hide();
     }
   });
-  mainWindow.webContents.on('did-finish-load', () => sendState());
+  mainWindow.webContents.on('did-finish-load', () => sendState(startupNotice ? { notice: startupNotice } : {}));
 }
 
 function positionAndShow() {
@@ -210,14 +235,19 @@ const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) {
   app.quit();
 } else {
-  app.on('second-instance', positionAndShow);
+  app.on('second-instance', (_event, commandLine) => {
+    if (commandLine.includes('--capture')) runCapture('region');
+    else positionAndShow();
+  });
   app.whenReady().then(() => {
+    ensureAppImageAutostart();
     loadState();
     createWindow();
     createTray();
     const registered = globalShortcut.register(SHORTCUT, () => runCapture('region'));
     if (!registered) sendState({ error: `Could not register ${SHORTCUT}` });
-    if (!process.argv.includes('--hidden')) positionAndShow();
+    if (process.argv.includes('--capture')) setTimeout(() => runCapture('region'), 150);
+    else if (!process.argv.includes('--hidden')) positionAndShow();
   });
 }
 

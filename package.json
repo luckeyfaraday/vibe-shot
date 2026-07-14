@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "A fast screenshot shelf for coding-agent workflows.",
   "main": "src/main.js",
+  "desktopName": "vibeshot.desktop",
   "author": "Alan Luckey-Faraday",
   "homepage": "https://github.com/luckeyfaraday/vibe-shot#readme",
   "repository": {
@@ -16,6 +17,7 @@
     "dev": "electron .",
     "start": "electron .",
     "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "dist:appimage": "electron-builder --linux AppImage",
     "install:local": "bash scripts/install-local.sh",
     "uninstall:local": "bash scripts/uninstall-local.sh"
   },
@@ -28,7 +30,31 @@
   "engines": {
     "node": ">=20"
   },
+  "build": {
+    "appId": "dev.luckeyfaraday.vibeshot",
+    "productName": "VibeShot",
+    "artifactName": "VibeShot-${version}-${arch}.${ext}",
+    "asar": true,
+    "compression": "normal",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility",
+      "executableName": "vibeshot",
+      "syncDesktopName": true,
+      "icon": "build/icon.png"
+    },
+    "appImage": {
+      "compression": "zstd"
+    }
+  },
   "devDependencies": {
-    "electron": "43.1.0"
+    "electron": "43.1.0",
+    "electron-builder": "26.15.3"
   }
 }
