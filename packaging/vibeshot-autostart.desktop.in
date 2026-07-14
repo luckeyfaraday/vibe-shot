@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=VibeShot
+Comment=Keep the screenshot shelf ready in the system tray
+Exec=__PROJECT_DIR__/scripts/vibeshot --hidden
+Icon=__PROJECT_DIR__/packaging/vibeshot.svg
+Terminal=false
+Type=Application
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+StartupWMClass=vibeshot
+

@@ -1,0 +1,225 @@
+const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } = require('electron');
+const { execFile } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const SHORTCUT = 'CommandOrControl+Shift+4';
+const MAX_CAPTURES = 8;
+
+let mainWindow;
+let tray;
+let isCapturing = false;
+let captureHistory = [];
+
+function trayIcon() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+      <rect x="3" y="6" width="26" height="20" rx="6" fill="#181b1a"/>
+      <path d="M11 11h3l1.2-2h4.6l1.2 2h1.8c1.2 0 2.2 1 2.2 2.2v7.6c0 1.2-1 2.2-2.2 2.2H9.2A2.2 2.2 0 0 1 7 20.8v-7.6C7 12 8 11 9.2 11H11Z" fill="none" stroke="#b7f34a" stroke-width="2"/>
+      <circle cx="16" cy="17" r="3.5" fill="#b7f34a"/>
+    </svg>`;
+  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`).resize({ width: 18, height: 18 });
+}
+
+function statePath() {
+  return path.join(app.getPath('userData'), 'state.json');
+}
+
+function loadState() {
+  try {
+    const state = JSON.parse(fs.readFileSync(statePath(), 'utf8'));
+    captureHistory = (state.captures || [])
+      .filter((item) => item?.filePath && fs.existsSync(item.filePath))
+      .slice(0, MAX_CAPTURES);
+  } catch {
+    captureHistory = [];
+  }
+}
+
+function saveState() {
+  fs.mkdirSync(path.dirname(statePath()), { recursive: true });
+  fs.writeFileSync(statePath(), JSON.stringify({ captures: captureHistory }, null, 2));
+}
+
+function publicCapture(item) {
+  return {
+    ...item,
+    imageUrl: `file://${item.filePath.split(path.sep).map(encodeURIComponent).join('/')}`
+  };
+}
+
+function sendState(extra = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('state', {
+    captures: captureHistory.map(publicCapture),
+    shortcut: SHORTCUT.replace('CommandOrControl', process.platform === 'darwin' ? '⌘' : 'Ctrl'),
+    isCapturing,
+    ...extra
+  });
+}
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 410,
+    height: 360,
+    minWidth: 360,
+    minHeight: 300,
+    maxWidth: 540,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  mainWindow.setAlwaysOnTop(true, 'floating');
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+  mainWindow.webContents.on('did-finish-load', () => sendState());
+}
+
+function positionAndShow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const { screen } = require('electron');
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const [width, height] = mainWindow.getSize();
+  const { x, y, width: workWidth, height: workHeight } = display.workArea;
+  mainWindow.setPosition(x + workWidth - width - 18, y + workHeight - height - 18, false);
+  mainWindow.showInactive();
+}
+
+function captureDirectory() {
+  const directory = path.join(app.getPath('pictures'), 'VibeShot');
+  fs.mkdirSync(directory, { recursive: true });
+  return directory;
+}
+
+function timestamp() {
+  return new Date().toISOString().replace(/[:.]/g, '-');
+}
+
+function captureArgs(mode, filePath) {
+  if (mode === 'window') return ['-w', '-f', filePath];
+  if (mode === 'screen') return ['-f', filePath];
+  return ['-a', '-f', filePath];
+}
+
+function runCapture(mode = 'region') {
+  if (isCapturing) return;
+  isCapturing = true;
+  sendState();
+  mainWindow?.hide();
+
+  const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
+  execFile('gnome-screenshot', captureArgs(mode, filePath), (error) => {
+    isCapturing = false;
+    if (error || !fs.existsSync(filePath)) {
+      sendState({ error: error ? 'Capture cancelled' : 'No image was captured' });
+      positionAndShow();
+      return;
+    }
+
+    const image = nativeImage.createFromPath(filePath);
+    const size = image.getSize();
+    const capture = {
+      id: `${Date.now()}`,
+      filePath,
+      fileName: path.basename(filePath),
+      width: size.width,
+      height: size.height,
+      createdAt: new Date().toISOString()
+    };
+    captureHistory = [capture, ...captureHistory].slice(0, MAX_CAPTURES);
+    saveState();
+    clipboard.writeImage(image);
+    sendState({ notice: 'Captured and copied' });
+    positionAndShow();
+  });
+}
+
+function createTray() {
+  tray = new Tray(trayIcon());
+  tray.setToolTip(`VibeShot — ${SHORTCUT}`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Capture region', accelerator: SHORTCUT, click: () => runCapture('region') },
+    { label: 'Capture window', click: () => runCapture('window') },
+    { label: 'Capture screen', click: () => runCapture('screen') },
+    { type: 'separator' },
+    { label: 'Show shelf', click: positionAndShow },
+    { label: 'Open captures folder', click: () => shell.openPath(captureDirectory()) },
+    { type: 'separator' },
+    { label: 'Quit VibeShot', click: () => { app.isQuitting = true; app.quit(); } }
+  ]));
+  tray.on('click', () => mainWindow?.isVisible() ? mainWindow.hide() : positionAndShow());
+}
+
+function findCapture(id) {
+  return captureHistory.find((capture) => capture.id === id);
+}
+
+ipcMain.handle('capture', (_event, mode) => runCapture(mode));
+ipcMain.handle('copy', (_event, id) => {
+  const capture = findCapture(id);
+  if (!capture) return false;
+  clipboard.writeImage(nativeImage.createFromPath(capture.filePath));
+  return true;
+});
+ipcMain.handle('reveal', (_event, id) => {
+  const capture = findCapture(id);
+  if (capture) shell.showItemInFolder(capture.filePath);
+});
+ipcMain.handle('remove', (_event, id) => {
+  captureHistory = captureHistory.filter((capture) => capture.id !== id);
+  saveState();
+  sendState();
+});
+ipcMain.handle('clear', () => {
+  captureHistory = [];
+  saveState();
+  sendState();
+});
+ipcMain.handle('hide', () => mainWindow?.hide());
+ipcMain.handle('open-folder', () => shell.openPath(captureDirectory()));
+ipcMain.on('start-drag', (event, id) => {
+  const capture = findCapture(id);
+  if (!capture) return;
+  const source = nativeImage.createFromPath(capture.filePath);
+  const size = source.getSize();
+  const scale = Math.min(1, 180 / Math.max(size.width, size.height));
+  const icon = source.resize({
+    width: Math.max(1, Math.round(size.width * scale)),
+    height: Math.max(1, Math.round(size.height * scale))
+  });
+  event.sender.startDrag({ file: capture.filePath, icon });
+});
+
+const hasLock = app.requestSingleInstanceLock();
+if (!hasLock) {
+  app.quit();
+} else {
+  app.on('second-instance', positionAndShow);
+  app.whenReady().then(() => {
+    loadState();
+    createWindow();
+    createTray();
+    const registered = globalShortcut.register(SHORTCUT, () => runCapture('region'));
+    if (!registered) sendState({ error: `Could not register ${SHORTCUT}` });
+    if (!process.argv.includes('--hidden')) positionAndShow();
+  });
+}
+
+app.on('window-all-closed', () => {});
+app.on('will-quit', () => globalShortcut.unregisterAll());

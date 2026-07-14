@@ -1,0 +1,34 @@
+{
+  "name": "vibeshot",
+  "version": "0.1.0",
+  "description": "A fast screenshot shelf for coding-agent workflows.",
+  "main": "src/main.js",
+  "author": "Alan Luckey-Faraday",
+  "homepage": "https://github.com/luckeyfaraday/vibe-shot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luckeyfaraday/vibe-shot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luckeyfaraday/vibe-shot/issues"
+  },
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "install:local": "bash scripts/install-local.sh",
+    "uninstall:local": "bash scripts/uninstall-local.sh"
+  },
+  "keywords": [
+    "screenshot",
+    "developer-tools",
+    "electron"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "43.1.0"
+  }
+}

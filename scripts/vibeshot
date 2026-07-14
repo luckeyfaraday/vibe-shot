@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+exec "${PROJECT_DIR}/node_modules/.bin/electron" "${PROJECT_DIR}" "$@"
+

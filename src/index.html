@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file: data:; style-src 'self'; script-src 'self'" />
+    <title>VibeShot</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="titlebar">
+        <div class="brand" aria-label="VibeShot">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M7.5 7.5h2.2l1-1.8h4.6l1 1.8h1.9a2.3 2.3 0 0 1 2.3 2.3v6.4a2.3 2.3 0 0 1-2.3 2.3H5.8a2.3 2.3 0 0 1-2.3-2.3V9.8a2.3 2.3 0 0 1 2.3-2.3h1.7Z"/><circle cx="12" cy="13" r="3"/></svg>
+          </span>
+          <span>vibeshot</span>
+          <span class="status-dot" title="Ready"></span>
+        </div>
+        <div class="window-actions">
+          <button class="icon-button" id="folder-button" aria-label="Open captures folder" title="Open captures folder">
+            <svg viewBox="0 0 24 24"><path d="M3.5 7.5v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-6l-2-2h-5a2 2 0 0 0-2 2Z"/></svg>
+          </button>
+          <button class="icon-button" id="hide-button" aria-label="Hide VibeShot" title="Hide">
+            <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="capture-controls" aria-label="Screenshot controls">
+        <button class="capture-button" id="capture-button">
+          <span class="capture-icon">
+            <svg viewBox="0 0 24 24"><path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M8 20H5a1 1 0 0 1-1-1v-3M16 20h3a1 1 0 0 0 1-1v-3"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span>
+            <strong>Capture region</strong>
+            <small>Select any part of your screen</small>
+          </span>
+          <kbd id="shortcut">Ctrl Shift 4</kbd>
+        </button>
+        <div class="mode-row">
+          <button class="mode-button" data-mode="window">
+            <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 9h17"/></svg>
+            Window
+          </button>
+          <button class="mode-button" data-mode="screen">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M9 21h6M12 17.5V21"/></svg>
+            Full screen
+          </button>
+          <span class="capture-status" id="capture-status">Ready</span>
+        </div>
+      </section>
+
+      <section class="shelf-section">
+        <div class="section-heading">
+          <div>
+            <span>Recent captures</span>
+            <span class="count" id="capture-count">0</span>
+          </div>
+          <button class="text-button" id="clear-button" hidden>Clear shelf</button>
+        </div>
+
+        <div class="empty-state" id="empty-state">
+          <div class="drop-illustration" aria-hidden="true">
+            <div class="mini-shot"></div>
+            <svg viewBox="0 0 40 40"><path d="M20 5v21M12 18l8 8 8-8M9 34h22"/></svg>
+            <div class="mini-terminal"><span>›</span><i></i></div>
+          </div>
+          <div>
+            <strong>Capture. Drag. Prompt.</strong>
+            <p>Your screenshot is copied automatically. Drag a thumbnail straight into your coding agent.</p>
+          </div>
+        </div>
+
+        <div class="capture-list" id="capture-list" aria-live="polite"></div>
+      </section>
+
+      <footer>
+        <span><i class="key-dot"></i> Always ready in your tray</span>
+        <span id="storage-label">Saved to Pictures/VibeShot</span>
+      </footer>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </main>
+
+    <template id="capture-template">
+      <article class="capture-card">
+        <div class="thumbnail-wrap">
+          <img draggable="true" alt="Screenshot preview" />
+          <span class="drag-badge">
+            <svg viewBox="0 0 24 24"><path d="M8 5h8M8 9h8M8 13h8M8 17h8"/></svg>
+            Drag to agent
+          </span>
+          <button class="remove-button" aria-label="Remove from shelf" title="Remove from shelf">
+            <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
+          </button>
+        </div>
+        <div class="capture-meta">
+          <div><strong class="capture-name"></strong><span class="capture-details"></span></div>
+          <div class="card-actions">
+            <button class="small-icon-button reveal-button" aria-label="Show in folder" title="Show in folder">
+              <svg viewBox="0 0 24 24"><path d="M3.5 7.5v9a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-6l-2-2h-5a2 2 0 0 0-2 2Z"/></svg>
+            </button>
+            <button class="copy-button">
+              <svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+              Copy
+            </button>
+          </div>
+        </div>
+      </article>
+    </template>
+    <script src="renderer.js"></script>
+  </body>
+</html>

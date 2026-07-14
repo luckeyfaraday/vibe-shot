@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=VibeShot
+Comment=Capture, copy, and drag screenshots into coding agents
+Exec=__PROJECT_DIR__/scripts/vibeshot
+Icon=__PROJECT_DIR__/packaging/vibeshot.svg
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=screenshot;capture;developer;codex;claude;
+StartupNotify=true
+StartupWMClass=vibeshot
