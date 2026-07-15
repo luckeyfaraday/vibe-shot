@@ -2,6 +2,7 @@ const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImag
 const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { captureInvocation, fileUrl } = require('./platform');
 
 const SHORTCUT = 'CommandOrControl+Shift+4';
 const MAX_CAPTURES = 8;
@@ -30,7 +31,7 @@ function desktopExecPath(filePath) {
   return `"${filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-function ensureAppImageAutostart() {
+function ensureLinuxAutostart() {
   const appImagePath = process.env.APPIMAGE;
   if (!appImagePath || !fs.existsSync(appImagePath)) return;
 
@@ -48,6 +49,24 @@ function ensureAppImageAutostart() {
   } catch (error) {
     console.warn('Could not create the VibeShot autostart entry:', error.message);
   }
+}
+
+function ensureWindowsAutostart() {
+  if (process.platform !== 'win32' || !app.isPackaged) return;
+
+  try {
+    const settings = { path: process.execPath, args: ['--hidden'] };
+    const wasEnabled = app.getLoginItemSettings(settings).openAtLogin;
+    app.setLoginItemSettings({ ...settings, openAtLogin: true });
+    if (!wasEnabled) startupNotice = 'Shortcut will be ready automatically at login';
+  } catch (error) {
+    console.warn('Could not enable VibeShot at login:', error.message);
+  }
+}
+
+function ensureAutostart() {
+  if (process.platform === 'win32') ensureWindowsAutostart();
+  else if (process.platform === 'linux') ensureLinuxAutostart();
 }
 
 function loadState() {
@@ -69,7 +88,7 @@ function saveState() {
 function publicCapture(item) {
   return {
     ...item,
-    imageUrl: `file://${item.filePath.split(path.sep).map(encodeURIComponent).join('/')}`
+    imageUrl: fileUrl(item.filePath)
   };
 }
 
@@ -136,10 +155,9 @@ function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-function captureArgs(mode, filePath) {
-  if (mode === 'window') return ['-w', '-f', filePath];
-  if (mode === 'screen') return ['-f', filePath];
-  return ['-a', '-f', filePath];
+function windowsCaptureScriptPath() {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'capture-windows.ps1');
+  return path.join(__dirname, 'capture-windows.ps1');
 }
 
 function runCapture(mode = 'region') {
@@ -149,10 +167,22 @@ function runCapture(mode = 'region') {
   mainWindow?.hide();
 
   const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
-  execFile('gnome-screenshot', captureArgs(mode, filePath), (error) => {
+  const invocation = captureInvocation(process.platform, mode, filePath, windowsCaptureScriptPath());
+  if (!invocation) {
+    isCapturing = false;
+    sendState({ error: 'Screen capture is not supported on this platform' });
+    positionAndShow();
+    return;
+  }
+
+  execFile(invocation.command, invocation.args, invocation.options, (error) => {
     isCapturing = false;
     if (error || !fs.existsSync(filePath)) {
-      sendState({ error: error ? 'Capture cancelled' : 'No image was captured' });
+      let message = 'No image was captured';
+      if (error?.code === 2) message = 'Capture cancelled';
+      else if (error?.code === 'ENOENT' && process.platform === 'linux') message = 'gnome-screenshot is required';
+      else if (error) message = 'Could not capture the screen';
+      sendState({ error: message });
       positionAndShow();
       return;
     }
@@ -240,7 +270,8 @@ if (!hasLock) {
     else positionAndShow();
   });
   app.whenReady().then(() => {
-    ensureAppImageAutostart();
+    if (process.platform === 'win32') app.setAppUserModelId('dev.luckeyfaraday.vibeshot');
+    ensureAutostart();
     loadState();
     createWindow();
     createTray();
