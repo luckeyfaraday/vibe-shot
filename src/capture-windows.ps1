@@ -196,8 +196,6 @@ function Select-Region {
   $result = $form.ShowDialog()
   $form.Dispose()
   if ($result -ne [System.Windows.Forms.DialogResult]::OK) { return $null }
-  [System.Windows.Forms.Application]::DoEvents()
-  Start-Sleep -Milliseconds 80
   return $script:selectedBounds
 }
 
@@ -257,14 +255,11 @@ function Get-SelectedWindowBounds {
   )
 }
 
-function Save-ScreenArea {
-  param(
-    [System.Drawing.Rectangle]$Bounds,
-    [string]$Path
-  )
+function New-ScreenBitmap {
+  param([System.Drawing.Rectangle]$Bounds)
 
   if (($Bounds.Width -lt 1) -or ($Bounds.Height -lt 1)) {
-    throw 'The selected capture area is empty.'
+    throw 'The screen capture area is empty.'
   }
 
   $bitmap = New-Object System.Drawing.Bitmap(
@@ -280,6 +275,48 @@ function Save-ScreenArea {
       $Bounds.Size,
       [System.Drawing.CopyPixelOperation]::SourceCopy
     )
+  } catch {
+    $bitmap.Dispose()
+    throw
+  } finally {
+    $graphics.Dispose()
+  }
+  return $bitmap
+}
+
+function Save-BitmapArea {
+  param(
+    [System.Drawing.Bitmap]$Snapshot,
+    [System.Drawing.Rectangle]$SnapshotBounds,
+    [System.Drawing.Rectangle]$Bounds,
+    [string]$Path
+  )
+
+  $relativeBounds = New-Object System.Drawing.Rectangle(
+    ($Bounds.Left - $SnapshotBounds.Left),
+    ($Bounds.Top - $SnapshotBounds.Top),
+    $Bounds.Width,
+    $Bounds.Height
+  )
+  $bitmapBounds = New-Object System.Drawing.Rectangle(0, 0, $Snapshot.Width, $Snapshot.Height)
+  $sourceBounds = [System.Drawing.Rectangle]::Intersect($relativeBounds, $bitmapBounds)
+  if (($sourceBounds.Width -lt 1) -or ($sourceBounds.Height -lt 1)) {
+    throw 'The selected capture area is outside the desktop.'
+  }
+
+  $bitmap = New-Object System.Drawing.Bitmap(
+    $sourceBounds.Width,
+    $sourceBounds.Height,
+    [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+  )
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  try {
+    $graphics.DrawImage(
+      $Snapshot,
+      (New-Object System.Drawing.Rectangle(0, 0, $bitmap.Width, $bitmap.Height)),
+      $sourceBounds,
+      [System.Drawing.GraphicsUnit]::Pixel
+    )
     $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
   } finally {
     $graphics.Dispose()
@@ -287,13 +324,26 @@ function Save-ScreenArea {
   }
 }
 
-$bounds = switch ($Mode) {
-  'region' { Select-Region }
-  'window' { Get-SelectedWindowBounds }
-  'screen' {
-    [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position).Bounds
+$snapshotBounds = if ($Mode -eq 'screen') {
+  [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position).Bounds
+} else {
+  [System.Windows.Forms.SystemInformation]::VirtualScreen
+}
+$snapshot = New-ScreenBitmap $snapshotBounds
+$cancelled = $false
+try {
+  $bounds = switch ($Mode) {
+    'region' { Select-Region }
+    'window' { Get-SelectedWindowBounds }
+    'screen' { $snapshotBounds }
   }
+  if ($null -eq $bounds) {
+    $cancelled = $true
+  } else {
+    Save-BitmapArea -Snapshot $snapshot -SnapshotBounds $snapshotBounds -Bounds $bounds -Path $OutputPath
+  }
+} finally {
+  $snapshot.Dispose()
 }
 
-if ($null -eq $bounds) { exit 2 }
-Save-ScreenArea -Bounds $bounds -Path $OutputPath
+if ($cancelled) { exit 2 }
