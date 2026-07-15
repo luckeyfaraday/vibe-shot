@@ -1,7 +1,7 @@
 const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } = require('electron');
-const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { captureToFile } = require('./capture');
 
 const SHORTCUT = 'CommandOrControl+Shift+4';
 const MAX_CAPTURES = 8;
@@ -136,28 +136,33 @@ function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-function captureArgs(mode, filePath) {
-  if (mode === 'window') return ['-w', '-f', filePath];
-  if (mode === 'screen') return ['-f', filePath];
-  return ['-a', '-f', filePath];
+function captureErrorMessage(error) {
+  if (error?.code === 'ENOENT') return 'gnome-screenshot is not installed';
+  if (error?.code === 'CAPTURE_OUTPUT_TIMEOUT') return 'No image was captured';
+  if (error?.code === 'EMPTY_CAPTURE') return 'The captured image could not be read';
+  if (error?.signal) return `Capture failed (${error.signal})`;
+  return 'Capture cancelled';
 }
 
-function runCapture(mode = 'region') {
-  if (isCapturing) return;
+async function runCapture(mode = 'region') {
+  if (isCapturing) return false;
   isCapturing = true;
   sendState();
   mainWindow?.hide();
 
-  const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
-  execFile('gnome-screenshot', captureArgs(mode, filePath), (error) => {
-    isCapturing = false;
-    if (error || !fs.existsSync(filePath)) {
-      sendState({ error: error ? 'Capture cancelled' : 'No image was captured' });
-      positionAndShow();
-      return;
-    }
+  let stateUpdate;
+
+  try {
+    const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
+    await captureToFile(mode, filePath);
 
     const image = nativeImage.createFromPath(filePath);
+    if (image.isEmpty()) {
+      const error = new Error(`Capture output is not a readable image: ${filePath}`);
+      error.code = 'EMPTY_CAPTURE';
+      throw error;
+    }
+
     const size = image.getSize();
     const capture = {
       id: `${Date.now()}`,
@@ -170,9 +175,17 @@ function runCapture(mode = 'region') {
     captureHistory = [capture, ...captureHistory].slice(0, MAX_CAPTURES);
     saveState();
     clipboard.writeImage(image);
-    sendState({ notice: 'Captured and copied' });
+    stateUpdate = { notice: 'Captured and copied' };
+    return true;
+  } catch (error) {
+    console.warn('Capture failed:', error.message);
+    stateUpdate = { error: captureErrorMessage(error) };
+    return false;
+  } finally {
+    isCapturing = false;
+    sendState(stateUpdate);
     positionAndShow();
-  });
+  }
 }
 
 function createTray() {

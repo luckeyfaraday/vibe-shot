@@ -16,7 +16,8 @@
   "scripts": {
     "dev": "electron .",
     "start": "electron .",
-    "check": "node --check src/main.js && node --check src/preload.js && node --check src/renderer.js",
+    "check": "node --check src/capture.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --test",
+    "test": "node --test",
     "dist:appimage": "electron-builder --linux AppImage --publish never",
     "install:local": "bash scripts/install-local.sh",
     "uninstall:local": "bash scripts/uninstall-local.sh"
