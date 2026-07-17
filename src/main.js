@@ -1,8 +1,8 @@
 const { app, BrowserWindow, clipboard, globalShortcut, ipcMain, Menu, nativeImage, shell, Tray } = require('electron');
-const { execFile } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { captureInvocation, fileUrl } = require('./platform');
+const { captureToFile } = require('./capture');
+const { fileUrl } = require('./platform');
 
 const SHORTCUT = 'CommandOrControl+Shift+4';
 const MAX_CAPTURES = 8;
@@ -160,34 +160,38 @@ function windowsCaptureScriptPath() {
   return path.join(__dirname, 'capture-windows.ps1');
 }
 
-function runCapture(mode = 'region') {
-  if (isCapturing) return;
+function captureErrorMessage(error) {
+  if (error?.code === 'UNSUPPORTED_PLATFORM') return 'Screen capture is not supported on this platform';
+  if (error?.code === 2) return 'Capture cancelled';
+  if (error?.code === 'ENOENT' && process.platform === 'linux') return 'gnome-screenshot is required';
+  if (error?.code === 'CAPTURE_OUTPUT_TIMEOUT') return 'No image was captured';
+  if (error?.code === 'EMPTY_CAPTURE') return 'The captured image could not be read';
+  if (error?.signal) return `Capture failed (${error.signal})`;
+  return 'Could not capture the screen';
+}
+
+async function runCapture(mode = 'region') {
+  if (isCapturing) return false;
   isCapturing = true;
   sendState();
   mainWindow?.hide();
 
-  const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
-  const invocation = captureInvocation(process.platform, mode, filePath, windowsCaptureScriptPath());
-  if (!invocation) {
-    isCapturing = false;
-    sendState({ error: 'Screen capture is not supported on this platform' });
-    positionAndShow();
-    return;
-  }
+  let stateUpdate;
 
-  execFile(invocation.command, invocation.args, invocation.options, (error) => {
-    isCapturing = false;
-    if (error || !fs.existsSync(filePath)) {
-      let message = 'No image was captured';
-      if (error?.code === 2) message = 'Capture cancelled';
-      else if (error?.code === 'ENOENT' && process.platform === 'linux') message = 'gnome-screenshot is required';
-      else if (error) message = 'Could not capture the screen';
-      sendState({ error: message });
-      positionAndShow();
-      return;
-    }
+  try {
+    const filePath = path.join(captureDirectory(), `vibeshot-${timestamp()}.png`);
+    await captureToFile(mode, filePath, {
+      platform: process.platform,
+      windowsScriptPath: windowsCaptureScriptPath()
+    });
 
     const image = nativeImage.createFromPath(filePath);
+    if (image.isEmpty()) {
+      const error = new Error(`Capture output is not a readable image: ${filePath}`);
+      error.code = 'EMPTY_CAPTURE';
+      throw error;
+    }
+
     const size = image.getSize();
     const capture = {
       id: `${Date.now()}`,
@@ -200,9 +204,17 @@ function runCapture(mode = 'region') {
     captureHistory = [capture, ...captureHistory].slice(0, MAX_CAPTURES);
     saveState();
     clipboard.writeImage(image);
-    sendState({ notice: 'Captured and copied' });
+    stateUpdate = { notice: 'Captured and copied' };
+    return true;
+  } catch (error) {
+    console.warn('Capture failed:', error.message);
+    stateUpdate = { error: captureErrorMessage(error) };
+    return false;
+  } finally {
+    isCapturing = false;
+    sendState(stateUpdate);
     positionAndShow();
-  });
+  }
 }
 
 function createTray() {
