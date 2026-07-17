@@ -1,0 +1,20 @@
+# VibeShot
+
+> VibeShot is a free, open-source screenshot tool and always-on-top screenshot shelf for AI coding-agent workflows on Windows and Linux. It captures regions, windows, and full screens as local PNG files, automatically copies each capture, and lets users drag recent screenshots into Codex, Claude Code, OpenCode, terminals, and other file-aware apps.
+
+VibeShot runs locally and does not require an account, cloud service, browser extension, AI API, or agent-specific plugin. It stores captures in the current user's `Pictures/VibeShot` directory and keeps the eight most recent images on its shelf. Windows 10/11 and Linux with X11 are supported; Linux requires `gnome-screenshot`. Wayland and macOS are not currently supported.
+
+## Documentation
+
+- [README](https://raw.githubusercontent.com/luckeyfaraday/vibe-shot/main/README.md): Canonical product overview, features, compatibility, installation, usage, privacy, FAQ, build, and contribution documentation.
+- [License](https://raw.githubusercontent.com/luckeyfaraday/vibe-shot/main/LICENSE): MIT License terms.
+
+## Downloads and source
+
+- [Latest release](https://github.com/luckeyfaraday/vibe-shot/releases/latest): Published VibeShot installers, AppImages, and checksums.
+- [Source repository](https://github.com/luckeyfaraday/vibe-shot): Canonical source code and project history.
+
+## Support and development
+
+- [Issue tracker](https://github.com/luckeyfaraday/vibe-shot/issues): Bug reports and feature requests.
+- [GitHub Actions](https://github.com/luckeyfaraday/vibe-shot/actions): Ubuntu and Windows checks and release builds.
