@@ -19,6 +19,7 @@
     "check": "node --check src/capture.js && node --check src/main.js && node --check src/preload.js && node --check src/renderer.js && node --test",
     "test": "node --test",
     "dist:appimage": "electron-builder --linux AppImage --publish never",
+    "dist:windows": "electron-builder --win nsis --publish never",
     "install:local": "bash scripts/install-local.sh",
     "uninstall:local": "bash scripts/uninstall-local.sh"
   },
@@ -39,6 +40,7 @@
     "compression": "normal",
     "files": [
       "src/**/*",
+      "!src/capture-windows.ps1",
       "package.json"
     ],
     "linux": {
@@ -52,6 +54,30 @@
     },
     "appImage": {
       "compression": "zstd"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "src/capture-windows.ps1",
+          "to": "capture-windows.ps1"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VibeShot"
     }
   },
   "devDependencies": {

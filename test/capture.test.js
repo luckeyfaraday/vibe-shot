@@ -19,21 +19,25 @@ test('captureToFile waits when the launcher exits before the PNG is written', as
 
   let invokedCommand;
   let invokedArgs;
-  const execFileImpl = (command, args, callback) => {
+  let invokedOptions;
+  const execFileImpl = (command, args, options, callback) => {
     invokedCommand = command;
     invokedArgs = args;
+    invokedOptions = options;
     setImmediate(() => callback(null));
     setTimeout(() => fs.writeFileSync(filePath, 'png data'), 40);
   };
 
   await captureToFile('region', filePath, {
     execFileImpl,
+    platform: 'linux',
     timeoutMs: 500,
     pollIntervalMs: 5
   });
 
   assert.equal(invokedCommand, 'gnome-screenshot');
   assert.deepEqual(invokedArgs, ['-a', '-f', filePath]);
+  assert.deepEqual(invokedOptions, {});
   assert.equal(fs.readFileSync(filePath, 'utf8'), 'png data');
 });
 
@@ -48,10 +52,55 @@ test('waitForFile rejects when a successful launcher never produces output', asy
 
 test('captureToFile preserves command failures', async () => {
   const commandError = Object.assign(new Error('command failed'), { code: 1 });
-  const execFileImpl = (_command, _args, callback) => setImmediate(() => callback(commandError));
+  const execFileImpl = (_command, _args, _options, callback) => setImmediate(() => callback(commandError));
 
   await assert.rejects(
-    captureToFile('screen', '/tmp/unused-vibeshot.png', { execFileImpl }),
+    captureToFile('screen', '/tmp/unused-vibeshot.png', { execFileImpl, platform: 'linux' }),
     commandError
   );
+});
+
+test('captureToFile uses the Windows PowerShell invocation', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vibeshot-test-'));
+  const filePath = path.join(directory, 'capture.png');
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+
+  let invocation;
+  const execFileImpl = (command, args, options, callback) => {
+    invocation = { command, args, options };
+    fs.writeFileSync(filePath, 'png data');
+    setImmediate(() => callback(null));
+  };
+
+  await captureToFile('window', filePath, {
+    execFileImpl,
+    platform: 'win32',
+    windowsScriptPath: 'C:\\Program Files\\VibeShot\\capture-windows.ps1',
+    environment: { SystemRoot: 'C:\\Windows' }
+  });
+
+  assert.equal(invocation.command, path.win32.join('C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'));
+  assert.deepEqual(invocation.args.slice(-6), [
+    '-File',
+    'C:\\Program Files\\VibeShot\\capture-windows.ps1',
+    '-Mode',
+    'window',
+    '-OutputPath',
+    filePath
+  ]);
+  assert.deepEqual(invocation.options, { windowsHide: true });
+});
+
+test('captureToFile rejects unsupported platforms before running a command', async () => {
+  let invoked = false;
+
+  await assert.rejects(
+    captureToFile('region', '/tmp/unused-vibeshot.png', {
+      platform: 'darwin',
+      execFileImpl: () => { invoked = true; }
+    }),
+    (error) => error.code === 'UNSUPPORTED_PLATFORM'
+  );
+
+  assert.equal(invoked, false);
 });

@@ -3,11 +3,19 @@
 [![Check](https://github.com/luckeyfaraday/vibe-shot/actions/workflows/check.yml/badge.svg)](https://github.com/luckeyfaraday/vibe-shot/actions/workflows/check.yml)
 [![MIT License](https://img.shields.io/badge/license-MIT-b9f45a.svg)](LICENSE)
 
-A tiny screenshot shelf designed for coding-agent workflows on Linux. It turns screenshots into something you can immediately paste or drag into Codex, Claude Code, OpenCode, a terminal, or any file-aware app.
+A tiny screenshot shelf designed for coding-agent workflows on Windows and Linux. It turns screenshots into something you can immediately paste or drag into Codex, Claude Code, OpenCode, a terminal, or any file-aware app.
 
 Press **Ctrl+Shift+4**, select a region, then either paste the image from your clipboard or drag its thumbnail directly into your terminal. Captures are saved to `~/Pictures/VibeShot`.
 
-## Download the AppImage
+## Download
+
+### Windows
+
+Download and run `VibeShot-*-x64.exe` from [GitHub Releases](https://github.com/luckeyfaraday/vibe-shot/releases/latest). The installer adds Start menu and desktop shortcuts. Launch VibeShot once after installing it; it then starts quietly in the tray at login so the global shortcut is always ready.
+
+Windows capture support uses built-in operating-system APIs and does not require a separate screenshot utility.
+
+### Linux AppImage
 
 Download the latest AppImage from [GitHub Releases](https://github.com/luckeyfaraday/vibe-shot/releases/latest), then:
 
@@ -38,7 +46,7 @@ npm install
 npm run dev
 ```
 
-Requirements: Linux with X11, Node.js 20 or newer, and `gnome-screenshot`. The current release is developed and tested on Ubuntu 24.04 with Cinnamon.
+Requirements: Windows 10/11, or Linux with X11 and `gnome-screenshot`; plus Node.js 20 or newer when running from source. Linux development currently targets Ubuntu 24.04 with Cinnamon.
 
 To build the AppImage yourself:
 
@@ -46,7 +54,13 @@ To build the AppImage yourself:
 npm run dist:appimage
 ```
 
-## Install on this machine
+To build the Windows installer on Windows:
+
+```powershell
+npm run dist:windows
+```
+
+## Install locally on Linux
 
 ```bash
 npm run install:local
@@ -63,11 +77,11 @@ This adds VibeShot to the Cinnamon app menu, links a `vibeshot` command into `~/
 - **Copy**: copy an older capture back to the clipboard
 - Drag a thumbnail: drop the PNG file into a coding-agent CLI or any file-aware app
 
-VibeShot currently targets Cinnamon/X11 and uses the machine's existing `gnome-screenshot` capture UI.
+On Windows, VibeShot provides its own region and window selectors. On Linux, it targets Cinnamon/X11 and uses the machine's existing `gnome-screenshot` capture UI.
 
 The AppImage can also be invoked directly with `--capture`, which captures immediately whether or not VibeShot is already running.
 
-## Uninstall
+## Uninstall the local Linux launcher
 
 ```bash
 npm run uninstall:local

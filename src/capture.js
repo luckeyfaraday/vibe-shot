@@ -1,13 +1,8 @@
 const { execFile } = require('node:child_process');
 const fs = require('node:fs');
+const { captureArgs, captureInvocation } = require('./platform');
 
 const CAPTURE_OUTPUT_TIMEOUT_MS = 120_000;
-
-function captureArgs(mode, filePath) {
-  if (mode === 'window') return ['-w', '-f', filePath];
-  if (mode === 'screen') return ['-f', filePath];
-  return ['-a', '-f', filePath];
-}
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -39,9 +34,21 @@ async function waitForFile(filePath, {
   }
 }
 
-function runCaptureCommand(mode, filePath, execFileImpl) {
+function runCaptureCommand(mode, filePath, {
+  execFileImpl,
+  platform,
+  windowsScriptPath,
+  environment
+}) {
+  const invocation = captureInvocation(platform, mode, filePath, windowsScriptPath, environment);
+  if (!invocation) {
+    const error = new Error(`Screen capture is not supported on ${platform}`);
+    error.code = 'UNSUPPORTED_PLATFORM';
+    return Promise.reject(error);
+  }
+
   return new Promise((resolve, reject) => {
-    execFileImpl('gnome-screenshot', captureArgs(mode, filePath), (error) => {
+    execFileImpl(invocation.command, invocation.args, invocation.options, (error) => {
       if (error) reject(error);
       else resolve();
     });
@@ -52,12 +59,20 @@ async function captureToFile(mode, filePath, {
   execFileImpl = execFile,
   fsModule = fs,
   timeoutMs = CAPTURE_OUTPUT_TIMEOUT_MS,
-  pollIntervalMs = 50
+  pollIntervalMs = 50,
+  platform = process.platform,
+  windowsScriptPath,
+  environment = process.env
 } = {}) {
-  await runCaptureCommand(mode, filePath, execFileImpl);
+  await runCaptureCommand(mode, filePath, {
+    execFileImpl,
+    platform,
+    windowsScriptPath,
+    environment
+  });
 
-  // gnome-screenshot is a GApplication. If another instance owns its D-Bus
-  // name, this launcher can exit before that instance finishes writing the PNG.
+  // Some capture launchers can exit before another process finishes writing
+  // the PNG, so do not report completion until readable output exists.
   await waitForFile(filePath, { fsModule, timeoutMs, pollIntervalMs });
 }
 
