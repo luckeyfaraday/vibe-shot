@@ -30,6 +30,7 @@ test('captureToFile waits when the launcher exits before the PNG is written', as
 
   await captureToFile('region', filePath, {
     execFileImpl,
+    platform: 'linux',
     timeoutMs: 500,
     pollIntervalMs: 5
   });
@@ -54,7 +55,7 @@ test('captureToFile preserves command failures', async () => {
   const execFileImpl = (_command, _args, _options, callback) => setImmediate(() => callback(commandError));
 
   await assert.rejects(
-    captureToFile('screen', '/tmp/unused-vibeshot.png', { execFileImpl }),
+    captureToFile('screen', '/tmp/unused-vibeshot.png', { execFileImpl, platform: 'linux' }),
     commandError
   );
 });
