@@ -1,7 +1,7 @@
 {
   "name": "vibeshot",
   "version": "0.1.0",
-  "description": "A fast screenshot shelf for coding-agent workflows.",
+  "description": "Open-source screenshot shelf for AI coding agents on Windows and Linux. Capture, copy, and drag PNGs into prompts and terminals.",
   "main": "src/main.js",
   "desktopName": "vibeshot.desktop",
   "author": "Alan Luckey-Faraday",
@@ -25,8 +25,20 @@
   },
   "keywords": [
     "screenshot",
+    "screenshot-tool",
+    "screenshot-shelf",
+    "screen-capture",
+    "ai-coding-agents",
+    "coding-agents",
     "developer-tools",
-    "electron"
+    "productivity",
+    "electron",
+    "windows",
+    "linux",
+    "appimage",
+    "codex",
+    "claude-code",
+    "opencode"
   ],
   "license": "MIT",
   "engines": {
