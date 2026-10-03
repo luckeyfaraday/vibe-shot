@@ -42,9 +42,6 @@ public static class VibeShotNativeMethods
     public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr value);
 
     [DllImport("user32.dll")]
-    public static extern uint GetDpiForWindow(IntPtr window);
-
-    [DllImport("user32.dll")]
     public static extern IntPtr WindowFromPoint(Point point);
 
     [DllImport("user32.dll")]
@@ -114,23 +111,6 @@ function New-SelectionForm {
   return $form
 }
 
-function ConvertTo-PhysicalFormPoint {
-  param(
-    [System.Windows.Forms.Form]$Form,
-    [System.Drawing.Point]$Point
-  )
-
-  # Windows PowerShell's WinForms host can report mouse coordinates scaled by
-  # the display DPI even when screen bounds use physical pixels.
-  $dpi = [VibeShotNativeMethods]::GetDpiForWindow($Form.Handle)
-  if ($dpi -eq 0) { $dpi = 96 }
-  $scale = 96.0 / $dpi
-  return New-Object System.Drawing.Point(
-    [Math]::Round($Point.X * $scale),
-    [Math]::Round($Point.Y * $scale)
-  )
-}
-
 function Select-Region {
   $form = New-SelectionForm 'Drag to capture a region  |  Esc to cancel'
   $script:startPoint = $null
@@ -171,8 +151,10 @@ function Select-Region {
   })
   $form.Add_MouseUp({
     if (($null -eq $script:startPoint) -or ($_.Button -ne [System.Windows.Forms.MouseButtons]::Left)) { return }
-    $startPoint = ConvertTo-PhysicalFormPoint $form $script:startPoint
-    $endPoint = ConvertTo-PhysicalFormPoint $form $_.Location
+    # The per-monitor DPI-aware selector already receives physical pixels.
+    # Translate the client origin only; scaling again shifts and shrinks the crop.
+    $startPoint = $form.PointToScreen($script:startPoint)
+    $endPoint = $form.PointToScreen($_.Location)
     $left = [Math]::Min($startPoint.X, $endPoint.X)
     $top = [Math]::Min($startPoint.Y, $endPoint.Y)
     $width = [Math]::Abs($startPoint.X - $endPoint.X)
@@ -184,8 +166,8 @@ function Select-Region {
       return
     }
     $script:selectedBounds = New-Object System.Drawing.Rectangle(
-      ($form.Left + $left),
-      ($form.Top + $top),
+      $left,
+      $top,
       $width,
       $height
     )
@@ -211,11 +193,7 @@ function Get-SelectedWindowBounds {
   })
   $form.Add_MouseClick({
     if ($_.Button -ne [System.Windows.Forms.MouseButtons]::Left) { return }
-    $clickPoint = ConvertTo-PhysicalFormPoint $form $_.Location
-    $script:windowPoint = New-Object System.Drawing.Point(
-      ($form.Left + $clickPoint.X),
-      ($form.Top + $clickPoint.Y)
-    )
+    $script:windowPoint = $form.PointToScreen($_.Location)
     $form.Hide()
     [System.Windows.Forms.Application]::DoEvents()
     Start-Sleep -Milliseconds 80
